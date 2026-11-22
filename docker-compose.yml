@@ -1,0 +1,76 @@
+networks:
+  qlns_lan:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+services:
+  site_hn:
+    image: postgres:15
+    container_name: site_hn
+    environment:
+      POSTGRES_DB: qlns_hn
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: PasswordHN_123
+    ports:
+      - "5431:5432"
+    networks:
+      qlns_lan:
+        ipv4_address: 172.28.0.11
+    volumes:
+      - data_hn:/var/lib/postgresql/data
+
+  site_dn:
+    image: postgres:15
+    container_name: site_dn
+    environment:
+      POSTGRES_DB: qlns_dn
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: PasswordDN_123
+    ports:
+      - "5434:5432"
+    networks:
+      qlns_lan:
+        ipv4_address: 172.28.0.12
+    volumes:
+      - data_dn:/var/lib/postgresql/data
+
+  site_hcm:
+    image: postgres:15
+    container_name: site_hcm
+    environment:
+      POSTGRES_DB: qlns_hcm
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: PasswordHCM_123
+    ports:
+      - "5433:5432"
+    networks:
+      qlns_lan:
+        ipv4_address: 172.28.0.13
+    volumes:
+      - data_hcm:/var/lib/postgresql/data
+
+  minio_server:
+    image: soldevelo/minio:latest
+    container_name: minio_server
+    environment:
+      - MINIO_ROOT_USER=admin_minio
+      - MINIO_ROOT_PASSWORD=PasswordMinio_123
+      - MINIO_DEFAULT_BUCKETS=nhansu-bucket
+      - MINIO_BROWSER=on
+    ports:
+      - "9000:9000"   # Cổng S3 API phục vụ truy xuất tệp trực tiếp
+      - "9001:9001"   # Cổng Web Console quản trị
+    networks:
+      qlns_lan:
+        ipv4_address: 172.28.0.20
+    volumes:
+      - data_minio:/bitnami/minio/data
+
+volumes:
+  data_hn:
+  data_dn:
+  data_hcm:
+  data_minio:
+
