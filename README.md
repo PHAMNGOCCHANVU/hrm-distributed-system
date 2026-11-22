@@ -161,6 +161,12 @@ python database/seed_minio/upload_minio.py
    JWT_SECRET=SpaceX_HRM_SecretKey_2026
    ```
 4. Khởi chạy FastAPI Server:
+
+   ```powershell
+   cd backend
+   .\.venv\Scripts\Activate.ps1
+   ```
+
    ```powershell
    uvicorn app.main:app --reload --port 8000
    ```

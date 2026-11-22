@@ -107,3 +107,6 @@ Thumbs.db
 [Oo]bj/
 
 docs/
+.antigravityignore
+.clineignore
+AGENTS.md
