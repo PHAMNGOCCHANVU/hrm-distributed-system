@@ -110,3 +110,4 @@ docs/
 .antigravityignore
 .clineignore
 AGENTS.md
+.ai-agents/
