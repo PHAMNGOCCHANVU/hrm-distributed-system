@@ -5,18 +5,11 @@ import { useAuth } from '../../context/AuthContext';
 
 export const Forbidden403 = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { logout } = useAuth();
 
   const handleBackHome = () => {
-    if (user?.role_id === 4 || user?.role_id === 3) {
-      navigate('/dashboard');
-    } else if (user?.department_name?.toLowerCase().includes('tài vụ')) {
-      navigate('/payroll');
-    } else if (user?.department_name?.toLowerCase().includes('nhân sự')) {
-      navigate('/employees');
-    } else {
-      navigate('/profile');
-    }
+    logout();
+    navigate('/login');
   };
 
   return (

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, Typography, Space, Divider, message } from 'antd';
+import { Form, Input, Button, Card, Typography, message } from 'antd';
 import { UserOutlined, LockOutlined, RocketOutlined } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -35,11 +35,6 @@ export const LoginPage = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = (username, password) => {
-    form.setFieldsValue({ username, password });
-    onFinish({ username, password });
   };
 
   return (
@@ -105,48 +100,6 @@ export const LoginPage = () => {
               </Button>
             </Form.Item>
           </Form>
-
-          <Divider plain className="!my-4 !text-xs !text-slate-400">
-            Tài khoản dùng thử một chạm (Mật khẩu: 123456)
-          </Divider>
-
-          <div className="grid grid-cols-1 gap-2">
-            <Button
-              size="small"
-              className="text-left text-xs h-auto py-1.5 px-3 flex justify-between items-center hover:border-blue-500"
-              onClick={() => handleQuickLogin('giap_gd', '123456')}
-            >
-              <span className="font-semibold text-slate-800">1. Tổng giám đốc (Lưu Quang Giáp - HN)</span>
-              <span className="text-slate-400 font-mono text-[11px]">giap_gd</span>
-            </Button>
-
-            <Button
-              size="small"
-              className="text-left text-xs h-auto py-1.5 px-3 flex justify-between items-center hover:border-blue-500"
-              onClick={() => handleQuickLogin('linh_hcm', '123456')}
-            >
-              <span className="font-semibold text-slate-800">2. Trưởng phòng (Trần Thị Mỹ Linh - HCM)</span>
-              <span className="text-slate-400 font-mono text-[11px]">linh_hcm</span>
-            </Button>
-
-            <Button
-              size="small"
-              className="text-left text-xs h-auto py-1.5 px-3 flex justify-between items-center hover:border-blue-500"
-              onClick={() => handleQuickLogin('cuong_dn', '123456')}
-            >
-              <span className="font-semibold text-slate-800">3. Nhân viên Kỹ thuật (Phạm Văn Cường - ĐN)</span>
-              <span className="text-slate-400 font-mono text-[11px]">cuong_dn</span>
-            </Button>
-
-            <Button
-              size="small"
-              className="text-left text-xs h-auto py-1.5 px-3 flex justify-between items-center hover:border-blue-500"
-              onClick={() => handleQuickLogin('hoa_nv', '123456')}
-            >
-              <span className="font-semibold text-slate-800">4. Nhân viên Quản trị (Nguyễn Thị Hoa - HN)</span>
-              <span className="text-slate-400 font-mono text-[11px]">hoa_nv</span>
-            </Button>
-          </div>
         </Card>
       </div>
     </div>
