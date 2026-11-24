@@ -17,18 +17,26 @@ def get_payroll_list(
 ) -> List[PayrollItem]:
     """
     Tra cứu bảng lương với phân quyền và PII Masking:
+    - Chặn Quản trị Kỹ thuật (SYSTEM_OPERATOR) truy cập.
     - Tổng giám đốc: Xem toàn bộ các chi nhánh.
     - Giám đốc chi nhánh: Chỉ xem được chi nhánh mình phụ trách.
     - Phòng Tài Vụ: Xem toàn bộ, nhưng PII của nhân viên các phòng khác bị che (Section 1.3 B).
     """
+    # 0. Chặn SYSTEM_OPERATOR không có vai trò tài vụ
+    if "SYSTEM_OPERATOR" in current_user.system_roles and not any(r in current_user.system_roles for r in ["FINANCE_SPECIALIST", "GROUP_EXECUTIVE", "BRANCH_DIRECTOR"]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "FORBIDDEN", "message": "Quản trị kỹ thuật (System Operator) không có quyền truy cập bảng lương!"}
+        )
+
     filter_branch = branch
 
     # 1. Kiểm tra thẩm quyền truy cập
-    if current_user.role_name == "Tổng giám đốc" or current_user.role_id == 4:
+    if current_user.role_name == "Tổng giám đốc" or current_user.role_id == 4 or "GROUP_EXECUTIVE" in current_user.system_roles:
         pass
-    elif current_user.role_name in ["Giám đốc", "Giám đốc chi nhánh"] or current_user.role_id == 3:
+    elif current_user.role_name in ["Giám đốc", "Giám đốc chi nhánh"] or current_user.role_id == 3 or "BRANCH_DIRECTOR" in current_user.system_roles:
         filter_branch = current_user.branch
-    elif current_user.department_name == "Phòng Tài Vụ":
+    elif "Phòng Tài Vụ" in current_user.department_name or "FINANCE_SPECIALIST" in current_user.system_roles:
         pass
     else:
         raise HTTPException(
@@ -44,7 +52,7 @@ def get_payroll_list(
     )
 
     items: List[PayrollItem] = []
-    is_finance_user = (current_user.department_name == "Phòng Tài Vụ")
+    is_finance_user = ("Phòng Tài Vụ" in current_user.department_name or "FINANCE_SPECIALIST" in current_user.system_roles)
 
     for r in records:
         ho_ten = r.get("hoten")
@@ -53,7 +61,6 @@ def get_payroll_list(
         is_pii_masked = False
 
         # 2. PII Masking cho Phòng Tài Vụ:
-        # Nhân viên các phòng khác ngoài Phòng Tài Vụ -> che thông tin cá nhân
         if is_finance_user and r.get("mapb") != current_user.department_id:
             ho_ten = "*** Bảo mật ***"
             sdt = "*** Bảo mật ***"
@@ -103,9 +110,9 @@ def update_payroll(
     target_branch = target_emp.get("chinhanh", "HN")
 
     # Kiểm tra thẩm quyền điều chỉnh lương (Section 2.2)
-    if current_user.role_name == "Tổng giám đốc" or current_user.role_id == 4:
+    if current_user.role_name == "Tổng giám đốc" or current_user.role_id == 4 or "GROUP_EXECUTIVE" in current_user.system_roles:
         pass
-    elif current_user.role_name in ["Giám đốc", "Giám đốc chi nhánh"] or current_user.role_id == 3:
+    elif current_user.role_name in ["Giám đốc", "Giám đốc chi nhánh"] or current_user.role_id == 3 or "BRANCH_DIRECTOR" in current_user.system_roles:
         if target_branch != current_user.branch:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

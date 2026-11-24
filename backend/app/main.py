@@ -6,7 +6,10 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.db_router import close_all_pools
-from app.api.routes import auth, employees, payroll, catalogs, system
+from app.api.routes import (
+    auth, employees, payroll, catalogs, system,
+    organizations, appointments, admin_requests, reports
+)
 
 
 @asynccontextmanager
@@ -19,8 +22,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="SpaceX HRM Distributed System API",
-    description="Hệ thống Quản trị Nhân sự & Lương Phân tán Đa Chi nhánh SpaceX",
-    version="1.0.0",
+    description="Hệ thống Quản trị Nhân sự & Lương Phân tán Đa Chi nhánh SpaceX (Enterprise Model)",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -83,8 +86,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 def root():
     return {
         "success": True,
-        "message": "SpaceX HRM Distributed Backend is running",
-        "version": "1.0.0"
+        "message": "SpaceX HRM Distributed Backend is running (Enterprise Edition)",
+        "version": "2.0.0"
     }
 
 
@@ -94,3 +97,7 @@ app.include_router(employees.router, prefix="/api")
 app.include_router(payroll.router, prefix="/api")
 app.include_router(catalogs.router, prefix="/api")
 app.include_router(system.router, prefix="/api")
+app.include_router(organizations.router, prefix="/api")
+app.include_router(appointments.router, prefix="/api")
+app.include_router(admin_requests.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")

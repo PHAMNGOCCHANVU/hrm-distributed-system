@@ -9,6 +9,10 @@ import {
   UserOutlined,
   LogoutOutlined,
   ProjectOutlined,
+  ApartmentOutlined,
+  SolutionOutlined,
+  ToolOutlined,
+  BarChartOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
 } from '@ant-design/icons';
@@ -25,20 +29,36 @@ export const MainLayout = ({ children }) => {
   const location = useLocation();
 
   const roleId = user?.role_id;
+  const position = user?.position || user?.ma_cv || '';
   const deptName = user?.department_name || '';
+  const deptId = user?.department_id || '';
   const branch = user?.branch || 'HN';
+  const orgType = user?.org_type || user?.loai_don_vi || (deptId.startsWith('PB_HQ_') ? 'TAP_DOAN' : 'CHI_NHANH');
 
-  // Build dynamic menu items according to role
+  // Detect Persona based on 4-concept Architecture:
+  const isCEO = roleId === 4 || position === 'CEO' || position === 'TGD';
+  const isBranchDirector = (roleId === 3 || position === 'GD' || position === 'GD_CN') && !isCEO;
+  const isOps = deptName.toLowerCase().includes('vận hành') || deptId.includes('OPS');
+  const isHR = deptName.toLowerCase().includes('nhân sự') || deptId.includes('HR');
+  const isFinance = deptName.toLowerCase().includes('tài vụ') || deptId.includes('FIN');
+  const isDeptManager = roleId === 2 || position === 'TP';
+
+  // Build dynamic menu items strictly adapting to user persona
   const getMenuItems = () => {
     const items = [];
 
-    // 1. General Director (Role 4)
-    if (roleId === 4) {
+    // Persona 1: CEO (Lãnh đạo Tập đoàn)
+    if (isCEO) {
       items.push(
         {
           key: '/dashboard',
           icon: <DashboardOutlined />,
-          label: 'Dashboard Tập đoàn',
+          label: 'Dashboard Toàn quốc',
+        },
+        {
+          key: '/organization/chart',
+          icon: <ApartmentOutlined />,
+          label: 'Cơ cấu Tập đoàn',
         },
         {
           key: '/employees',
@@ -51,24 +71,44 @@ export const MainLayout = ({ children }) => {
           label: 'Quản trị Lương Toàn quốc',
         },
         {
+          key: '/appointments',
+          icon: <SolutionOutlined />,
+          label: 'Phê duyệt Cấp cao',
+        },
+        {
+          key: '/system-admin/requests',
+          icon: <ToolOutlined />,
+          label: 'Duyệt Quyền Kỹ thuật',
+        },
+        {
+          key: '/reports',
+          icon: <BarChartOutlined />,
+          label: 'Báo cáo Chiến lược',
+        },
+        {
           key: '/system/health',
           icon: <LineChartOutlined />,
-          label: 'Sức khỏe Cụm Phân tán',
+          label: 'Giám sát Cụm Phân tán',
         },
         {
           key: '/system/audit',
           icon: <AuditOutlined />,
-          label: 'Nhật ký Kiểm toán Toàn tập đoàn',
+          label: 'Nhật ký Kiểm toán Toàn cục',
         }
       );
     }
-    // 2. Branch Director (Role 3)
-    else if (roleId === 3) {
+    // Persona 2: Branch Director (Giám đốc Chi nhánh)
+    else if (isBranchDirector) {
       items.push(
         {
           key: '/dashboard',
           icon: <DashboardOutlined />,
           label: `Dashboard Chi nhánh (${branch})`,
+        },
+        {
+          key: '/organization/chart',
+          icon: <ApartmentOutlined />,
+          label: 'Sơ đồ Tổ chức Tập đoàn',
         },
         {
           key: '/employees',
@@ -78,17 +118,63 @@ export const MainLayout = ({ children }) => {
         {
           key: '/payroll',
           icon: <DollarOutlined />,
-          label: `Lương Chi nhánh (${branch})`,
+          label: `Bảng lương Chi nhánh (${branch})`,
+        },
+        {
+          key: '/appointments',
+          icon: <SolutionOutlined />,
+          label: `Phê duyệt Chi nhánh (${branch})`,
+        },
+        {
+          key: '/system-admin/requests',
+          icon: <ToolOutlined />,
+          label: 'Duyệt Yêu cầu Kỹ thuật',
+        },
+        {
+          key: '/reports',
+          icon: <BarChartOutlined />,
+          label: `Báo cáo Chi nhánh (${branch})`,
         },
         {
           key: '/system/health',
           icon: <LineChartOutlined />,
-          label: 'Giám sát Node & CSDL',
+          label: 'Giám sát Shard Chi nhánh',
         }
       );
     }
-    // 3. HR (Staff or Manager)
-    else if (deptName.toLowerCase().includes('nhân sự') || user?.department_id === 'PB_HN_02') {
+    // Persona 3: System Operator (Phòng Vận hành - IT/Ops)
+    // Tách biệt quản trị kỹ thuật: Không thấy menu hồ sơ nhân sự / lương!
+    else if (isOps) {
+      items.push(
+        {
+          key: '/system/health',
+          icon: <LineChartOutlined />,
+          label: 'Giám sát Cụm CSDL & MinIO',
+        },
+        {
+          key: '/system-admin/requests',
+          icon: <ToolOutlined />,
+          label: 'Yêu cầu Bảo trì / Cấp quyền',
+        },
+        {
+          key: '/system/audit',
+          icon: <AuditOutlined />,
+          label: 'Nhật ký Hoạt động Kỹ thuật',
+        },
+        {
+          key: '/organization/chart',
+          icon: <ApartmentOutlined />,
+          label: 'Sơ đồ Tổ chức',
+        },
+        {
+          key: '/profile',
+          icon: <UserOutlined />,
+          label: 'Hồ sơ Cá nhân (ESS)',
+        }
+      );
+    }
+    // Persona 4: HR Specialist / HR Manager (Phòng Nhân sự)
+    else if (isHR) {
       items.push(
         {
           key: '/employees',
@@ -96,9 +182,24 @@ export const MainLayout = ({ children }) => {
           label: 'Quản trị Nhân sự',
         },
         {
+          key: '/appointments',
+          icon: <SolutionOutlined />,
+          label: 'Bổ nhiệm & Điều chuyển',
+        },
+        {
+          key: '/organization/chart',
+          icon: <ApartmentOutlined />,
+          label: 'Cơ cấu Tổ chức',
+        },
+        {
           key: '/projects',
           icon: <ProjectOutlined />,
           label: 'Danh mục Dự án',
+        },
+        {
+          key: '/reports',
+          icon: <BarChartOutlined />,
+          label: 'Báo cáo Nhân sự',
         },
         {
           key: '/profile',
@@ -106,16 +207,9 @@ export const MainLayout = ({ children }) => {
           label: 'Hồ sơ & Phiếu lương của tôi',
         }
       );
-      if (roleId === 2) {
-        items.push({
-          key: '/system/audit',
-          icon: <AuditOutlined />,
-          label: 'Nhật ký Hoạt động Nhân sự',
-        });
-      }
     }
-    // 4. Finance / Payroll Department
-    else if (deptName.toLowerCase().includes('tài vụ') || user?.department_id === 'PB_HN_03') {
+    // Persona 5: Finance Specialist / Finance Manager (Phòng Tài vụ)
+    else if (isFinance) {
       items.push(
         {
           key: '/payroll',
@@ -125,7 +219,17 @@ export const MainLayout = ({ children }) => {
         {
           key: '/employees',
           icon: <TeamOutlined />,
-          label: 'Danh sách Nhân sự (Masked)',
+          label: 'Danh sách Nhân sự (PII Masked)',
+        },
+        {
+          key: '/organization/chart',
+          icon: <ApartmentOutlined />,
+          label: 'Cơ cấu Đơn vị',
+        },
+        {
+          key: '/reports',
+          icon: <BarChartOutlined />,
+          label: 'Báo cáo Quỹ lương',
         },
         {
           key: '/profile',
@@ -134,7 +238,32 @@ export const MainLayout = ({ children }) => {
         }
       );
     }
-    // 5. Normal Employee
+    // Persona 6: Department Manager (Trưởng phòng chuyên môn khác)
+    else if (isDeptManager) {
+      items.push(
+        {
+          key: '/employees',
+          icon: <TeamOutlined />,
+          label: 'Nhân sự Phòng ban',
+        },
+        {
+          key: '/organization/chart',
+          icon: <ApartmentOutlined />,
+          label: 'Sơ đồ Tổ chức',
+        },
+        {
+          key: '/reports',
+          icon: <BarChartOutlined />,
+          label: 'Báo cáo Phòng ban',
+        },
+        {
+          key: '/profile',
+          icon: <UserOutlined />,
+          label: 'Hồ sơ & Phiếu lương của tôi',
+        }
+      );
+    }
+    // Persona 7: Normal Employee (Nhân viên thông thường)
     else {
       items.push(
         {
@@ -146,6 +275,11 @@ export const MainLayout = ({ children }) => {
           key: '/employees',
           icon: <TeamOutlined />,
           label: 'Danh bạ Đồng nghiệp',
+        },
+        {
+          key: '/organization/chart',
+          icon: <ApartmentOutlined />,
+          label: 'Sơ đồ Tổ chức',
         }
       );
     }
@@ -169,8 +303,12 @@ export const MainLayout = ({ children }) => {
       label: (
         <div className="py-1">
           <div className="font-semibold text-slate-800">{user?.full_name}</div>
-          <div className="text-xs text-slate-400 font-mono">{user?.username} ({user?.role_name})</div>
-          <div className="text-xs text-blue-600">{user?.department_name} - {user?.branch}</div>
+          <div className="text-xs text-slate-400 font-mono">
+            {user?.username} ({user?.role_name || user?.position || 'Nhân viên'})
+          </div>
+          <div className="text-xs text-blue-600">
+            {user?.department_name} • {branch} ({orgType === 'TAP_DOAN' ? 'Tập đoàn' : 'Chi nhánh'})
+          </div>
         </div>
       ),
     },
@@ -206,7 +344,7 @@ export const MainLayout = ({ children }) => {
                 SpaceX HRM
               </span>
               <span className="text-[10px] text-slate-400 font-mono tracking-wider">
-                DISTRIBUTED CLUSTER
+                ENTERPRISE RESTRUCTURE
               </span>
             </div>
           )}
@@ -218,7 +356,7 @@ export const MainLayout = ({ children }) => {
             selectedKeys={[location.pathname]}
             items={getMenuItems()}
             onClick={handleMenuClick}
-            className="border-none"
+            className="border-none font-medium text-slate-700"
           />
         </div>
       </Sider>
@@ -233,10 +371,12 @@ export const MainLayout = ({ children }) => {
               className="text-slate-600 hover:text-slate-900"
             />
             <div className="hidden sm:flex items-center gap-2">
-              <span className="text-xs font-medium text-slate-500">Chi nhánh:</span>
-              <Tag color="blue" className="font-semibold">{user?.branch || 'HN'}</Tag>
+              <span className="text-xs font-medium text-slate-500">Cơ cấu:</span>
+              <Tag color={orgType === 'TAP_DOAN' ? 'gold' : 'blue'} className="font-semibold">
+                {orgType === 'TAP_DOAN' ? 'TẬP ĐOÀN (HỘI SỞ)' : `CHI NHÁNH ${branch}`}
+              </Tag>
               <span className="text-xs font-medium text-slate-500 ml-2">Phòng:</span>
-              <span className="text-xs font-semibold text-slate-700">{user?.department_name || 'Hội sở'}</span>
+              <span className="text-xs font-semibold text-slate-700">{deptName || 'Hội sở'}</span>
             </div>
           </div>
 
@@ -254,7 +394,7 @@ export const MainLayout = ({ children }) => {
                     {user?.full_name || 'Người dùng'}
                   </span>
                   <span className="text-[11px] text-slate-400">
-                    {user?.role_name || 'Nhân viên'}
+                    {user?.role_name || user?.position || 'Nhân viên'}
                   </span>
                 </div>
               </div>

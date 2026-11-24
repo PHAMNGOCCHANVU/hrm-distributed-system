@@ -33,21 +33,21 @@ def apply_salary_masking(item: Dict[str, Any], current_user: CurrentUser) -> Tup
     emp_mapb = item.get("mapb")
 
     # 1. Tổng giám đốc
-    if current_user.role_name == "Tổng giám đốc" or current_user.role_id == 4:
+    if current_user.role_name == "Tổng giám đốc" or current_user.role_id == 4 or "GROUP_EXECUTIVE" in current_user.system_roles:
         return raw_salary, False
 
     # 2. Giám đốc chi nhánh
-    if current_user.role_name in ["Giám đốc", "Giám đốc chi nhánh"] or current_user.role_id == 3:
+    if current_user.role_name in ["Giám đốc", "Giám đốc chi nhánh"] or current_user.role_id == 3 or "BRANCH_DIRECTOR" in current_user.system_roles:
         if emp_branch == current_user.branch:
             return raw_salary, False
         return None, True
 
     # 3. Phòng Tài Vụ
-    if current_user.department_name == "Phòng Tài Vụ":
+    if "Phòng Tài Vụ" in current_user.department_name or "FINANCE_SPECIALIST" in current_user.system_roles:
         return raw_salary, False
 
     # 4. Trưởng phòng chuyên môn
-    if (current_user.role_name == "Trưởng phòng" or current_user.role_id == 2) and current_user.department_name != "Phòng Nhân Sự":
+    if (current_user.role_name == "Trưởng phòng" or current_user.role_id == 2 or "DEPT_MANAGER" in current_user.system_roles) and "Phòng Nhân Sự" not in current_user.department_name:
         if emp_mapb == current_user.department_id and emp_branch == current_user.branch:
             return raw_salary, False
         return None, True
@@ -83,16 +83,16 @@ def list_employees(
         filter_branch = current_user.branch
 
     # - Nhân viên phòng Nhân sự (Role 1): Xem các phòng khác, loại trừ chính phòng Nhân Sự
-    elif current_user.department_name == "Phòng Nhân Sự" and current_user.role_id == 1:
-        exclude_dept = "Phòng Nhân Sự"
+    elif ("Phòng Nhân Sự" in current_user.department_name or "HR_SPECIALIST" in current_user.system_roles) and current_user.role_id == 1:
+        exclude_dept = current_user.department_name
 
     # - Trưởng phòng chuyên môn: Chỉ xem phòng mình và chi nhánh mình
-    elif (current_user.role_name == "Trưởng phòng" or current_user.role_id == 2) and current_user.department_name not in ["Phòng Nhân Sự", "Phòng Tài Vụ"]:
+    elif (current_user.role_id == 2 or "DEPT_MANAGER" in current_user.system_roles) and not any(r in current_user.system_roles for r in ["HR_SPECIALIST", "FINANCE_SPECIALIST", "GROUP_EXECUTIVE"]):
         filter_dept = current_user.department_id
         filter_branch = current_user.branch
 
     # - Nhân viên chuyên môn: Chỉ xem phòng mình và chi nhánh mình
-    elif current_user.role_id == 1 and current_user.department_name not in ["Phòng Nhân Sự", "Phòng Tài Vụ"]:
+    elif current_user.role_id == 1 and not any(r in current_user.system_roles for r in ["HR_SPECIALIST", "FINANCE_SPECIALIST", "GROUP_EXECUTIVE"]):
         filter_dept = current_user.department_id
         filter_branch = current_user.branch
 
@@ -191,12 +191,16 @@ def create_employee(
     current_user: CurrentUser
 ) -> Dict[str, Any]:
     """
-    Tạo mới hồ sơ nhân sự với Multi-Model Compensating Transaction:
-    1. Validate nghiệp vụ & Quy tắc 1 Trưởng phòng (Single Manager Rule).
-    2. Upload MinIO.
-    3. Ghi Shard CSDL theo MaCN.
-    4. Nếu SQL lỗi -> Đền bù xóa file trên MinIO.
+    Tạo mới hồ sơ nhân sự với Multi-Model Compensating Transaction.
+    Chặn Quản trị Kỹ thuật (SYSTEM_OPERATOR) can thiệp vào hồ sơ.
     """
+    # 0. Chặn SYSTEM_OPERATOR
+    if "SYSTEM_OPERATOR" in current_user.system_roles and not ("HR_SPECIALIST" in current_user.system_roles or "GROUP_EXECUTIVE" in current_user.system_roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "FORBIDDEN", "message": "Quản trị kỹ thuật (System Operator) không có quyền can thiệp vào hồ sơ nhân sự!"}
+        )
+
     target_site = get_write_pool(emp_in.ma_cn)
 
     # 1. Kiểm tra trùng lặp trên Coordinator SITE_HN
@@ -288,7 +292,6 @@ def create_employee(
         }
 
     except Exception as e:
-        # BÙ TRỪ ĐA MÔ HÌNH: Xóa sạch các file vừa tải lên MinIO
         for key in uploaded_keys:
             delete_file(key)
         raise e
@@ -301,7 +304,9 @@ def update_employee(
     cv_file: Optional[UploadFile],
     current_user: CurrentUser
 ) -> Dict[str, Any]:
-    """Cập nhật thông tin hồ sơ nhân sự."""
+    """
+    Cập nhật thông tin hồ sơ nhân sự có kiểm soát Manager Equality Rule.
+    """
     existing = employee_repo.get_employee_by_id(ma_nv, SITE_HN)
     if not existing:
         raise HTTPException(
@@ -312,7 +317,37 @@ def update_employee(
     branch = existing.get("chinhanh", "HN")
     target_site = get_write_pool(branch)
 
-    # Validate Trưởng phòng nếu có cập nhật vai trò hoặc phòng ban
+    # 1. KIỂM TRA QUY TẮC BÌNH ĐẲNG TRƯỞNG PHÒNG (MANAGER EQUALITY RULE)
+    is_editor_manager = (
+        current_user.role_id == 2 or 
+        current_user.role_name == "Trưởng phòng" or 
+        getattr(current_user, "position", "") == "TP" or 
+        "DEPT_MANAGER" in getattr(current_user, "system_roles", [])
+    )
+    is_editor_ceo = (
+        current_user.role_id == 4 or 
+        current_user.role_name == "Tổng giám đốc" or 
+        "GROUP_EXECUTIVE" in getattr(current_user, "system_roles", [])
+    )
+
+    target_role = existing.get("mavaitro")
+    target_cv = existing.get("macv")
+    is_target_manager = (target_role == 2 or target_cv == "TP")
+
+    if is_editor_manager and not is_editor_ceo:
+        # Trưởng phòng không được phép sửa Trưởng phòng khác
+        if is_target_manager and existing["manv"] != current_user.ma_nv:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "FORBIDDEN", "message": "Quy tắc bình đẳng: Trưởng phòng không được phép sửa đổi hồ sơ của Trưởng phòng khác!"}
+            )
+        # Trưởng phòng không được tự ý sửa chức vụ thành TP trực tiếp
+        if emp_update.ma_cv == "TP" and target_cv != "TP":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "FORBIDDEN", "message": "Thay đổi chức vụ cấp Trưởng phòng phải thông qua quy trình Đề xuất Bổ nhiệm và được Lãnh đạo phê duyệt!"}
+            )
+
     new_role = emp_update.ma_vai_tro if emp_update.ma_vai_tro is not None else existing.get("mavaitro")
     new_cv = emp_update.ma_cv if emp_update.ma_cv is not None else existing.get("macv")
     new_pb = emp_update.ma_pb if emp_update.ma_pb is not None else existing.get("mapb")

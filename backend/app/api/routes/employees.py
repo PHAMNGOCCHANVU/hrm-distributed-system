@@ -14,6 +14,21 @@ import app.services.employee_service as employee_service
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
 
+def require_hr_or_executive(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    """Kiểm tra quyền tạo nhân viên và chặn dứt điểm System Operator."""
+    if "SYSTEM_OPERATOR" in current_user.system_roles and not ("HR_SPECIALIST" in current_user.system_roles or "GROUP_EXECUTIVE" in current_user.system_roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "FORBIDDEN", "message": "Quản trị kỹ thuật (System Operator) không có quyền can thiệp vào hồ sơ nhân sự!"}
+        )
+    if current_user.role_id in [1, 2, 4] or any(r in current_user.system_roles for r in ["HR_SPECIALIST", "GROUP_EXECUTIVE", "BRANCH_DIRECTOR"]):
+        return current_user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={"code": "FORBIDDEN", "message": "Bạn không có quyền thêm mới hồ sơ nhân sự!"}
+    )
+
+
 @router.get("", response_model=ApiResponse[EmployeeListPagination])
 def get_employees(
     page: int = Query(1, ge=1),
@@ -74,10 +89,10 @@ def get_employee_detail(
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=ApiResponse[Dict[str, Any]])
 def create_employee(
+    current_user: CurrentUser = Depends(require_hr_or_executive),
     data: str = Form(..., description="Chuỗi JSON serialize từ object EmployeeCreate"),
     avatar: Optional[UploadFile] = File(None, description="Tệp ảnh đại diện"),
-    cv_pdf: Optional[UploadFile] = File(None, description="Tệp scan CV PDF"),
-    current_user: CurrentUser = Depends(require_roles(1, 2, "Nhân viên", "Trưởng phòng", "Tổng giám đốc"))
+    cv_pdf: Optional[UploadFile] = File(None, description="Tệp scan CV PDF")
 ):
     """
     Thêm mới hồ sơ nhân sự đa mô hình (Multipart Form-Data):
@@ -116,10 +131,10 @@ def update_employee(
     data: Optional[str] = Form(None),
     avatar: Optional[UploadFile] = File(None),
     cv_pdf: Optional[UploadFile] = File(None),
-    current_user: CurrentUser = Depends(require_roles(1, 2, "Nhân viên", "Trưởng phòng", "Tổng giám đốc"))
+    current_user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Cập nhật thông tin hồ sơ nhân sự.
+    Cập nhật thông tin hồ sơ nhân sự (Kiểm tra Manager Equality Rule).
     """
     emp_update = EmployeeUpdate()
     if data:

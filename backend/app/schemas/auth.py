@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field
 
 
@@ -16,7 +16,12 @@ class UserPayload(BaseModel):
     department_id: str
     department_name: str
     branch: str
-    scope: str  # "GLOBAL" hoặc "BRANCH"
+    scope: str  # "GLOBAL", "BRANCH", "DEPARTMENT", "PERSONAL"
+    # Các khái niệm mở rộng mô hình Tập đoàn
+    position: Optional[str] = "NV"           # CEO, GD_CN, TP, NV
+    cap_bac: Optional[int] = 4              # 1: CEO, 2: GD_CN, 3: TP, 4: NV
+    system_roles: List[str] = []            # GROUP_EXECUTIVE, BRANCH_DIRECTOR, DEPT_MANAGER, HR_SPECIALIST, FINANCE_SPECIALIST, SYSTEM_OPERATOR, EMPLOYEE
+    org_type: Optional[str] = "CHI_NHANH"    # "TAP_DOAN" hoặc "CHI_NHANH"
 
 
 class LoginData(BaseModel):
